@@ -124,6 +124,7 @@ class Trainer(object):
         self.lr_warmup_scheduler = lr_warmup_scheduler
         self.warmup_epoch = warmup_epoch
         self.grad_norm_clip = grad_norm_clip
+        self.min_val_loss=1e7
 
     def _train_it(self, batch):
         self.model.train()
@@ -138,42 +139,43 @@ class Trainer(object):
         return loss.item(), tb_dict, disp_dict
 
     def eval_epoch(self, d_loader):
-        self.model.eval()
+        with torch.no_grad():
 
-        eval_dict = {}
-        total_loss = count = 0.0
 
-        # eval one epoch
-        for i, data in tqdm.tqdm(enumerate(d_loader, 0), total=len(d_loader), leave=False, desc='val'):
-            self.optimizer.zero_grad()
+            eval_dict = {}
+            total_loss = count = 0.0
 
-            loss, tb_dict, disp_dict = self.model_fn_eval(self.model, data)
+            # eval one epoch
+            for i, data in tqdm.tqdm(enumerate(d_loader, 0), total=len(d_loader), leave=False, desc='val',disable=True):
+                self.optimizer.zero_grad()
 
-            total_loss += loss.item()
-            count += 1
-            for k, v in tb_dict.items():
-                eval_dict[k] = eval_dict.get(k, 0) + v
+                loss, tb_dict, disp_dict = self.model_fn_eval(self.model, data)
 
-        # statistics this epoch
-        for k, v in eval_dict.items():
-            eval_dict[k] = eval_dict[k] / max(count, 1)
+                total_loss += loss.item()
+                count += 1
+                for k, v in tb_dict.items():
+                    eval_dict[k] = eval_dict.get(k, 0) + v
 
-        cur_performance = 0
-        if 'recalled_cnt' in eval_dict:
-            eval_dict['recall'] = eval_dict['recalled_cnt'] / max(eval_dict['gt_cnt'], 1)
-            cur_performance = eval_dict['recall']
-        elif 'iou' in eval_dict:
-            cur_performance = eval_dict['iou']
+            # statistics this epoch
+            for k, v in eval_dict.items():
+                eval_dict[k] = eval_dict[k] / max(count, 1)
 
-        return total_loss / count, eval_dict, cur_performance
+            cur_performance = 0
+            if 'recalled_cnt' in eval_dict:
+                eval_dict['recall'] = eval_dict['recalled_cnt'] / max(eval_dict['gt_cnt'], 1)
+                cur_performance = eval_dict['recall']
+            elif 'iou' in eval_dict:
+                cur_performance = eval_dict['iou']
+
+            return total_loss / count, eval_dict, cur_performance
 
     def train(self, start_it, start_epoch, n_epochs, train_loader, test_loader=None, ckpt_save_interval=5,
               lr_scheduler_each_iter=False):
         eval_frequency = self.eval_frequency if self.eval_frequency > 0 else 1
 
         it = start_it
-        with tqdm.trange(start_epoch, n_epochs, desc='epochs') as tbar, \
-                tqdm.tqdm(total=len(train_loader), leave=False, desc='train') as pbar:
+        with tqdm.trange(start_epoch, n_epochs, desc='epochs',disable=True) as tbar, \
+                tqdm.tqdm(total=len(train_loader), leave=False, desc='train',disable=True) as pbar:
 
             for epoch in tbar:
                 if self.lr_scheduler is not None and self.warmup_epoch <= epoch and (not lr_scheduler_each_iter):
@@ -227,14 +229,22 @@ class Trainer(object):
                     if test_loader is not None:
                         with torch.set_grad_enabled(False):
                             val_loss, eval_dict, cur_performance = self.eval_epoch(test_loader)
+                        print("val loss is {} for epoch {}".format(val_loss,epoch))
 
                         if self.tb_log is not None:
                             self.tb_log.add_scalar('val_loss', val_loss, it)
                             for key, val in eval_dict.items():
                                 self.tb_log.add_scalar('val_' + key, val, it)
+                        if self.min_val_loss>val_loss:
+                            print("val loss < prev val loss, save current best model")
+                            ckpt_name = os.path.join(self.ckpt_dir, 'model_best')
+                            self.min_val_loss=val_loss
+                            save_checkpoint(
+                        checkpoint_state(self.model, self.optimizer, trained_epoch, it), filename=ckpt_name,)
+            
 
                 pbar.close()
-                pbar = tqdm.tqdm(total=len(train_loader), leave=False, desc='train')
+                pbar = tqdm.tqdm(total=len(train_loader), leave=False, desc='train',disable=True)
                 pbar.set_postfix(dict(total_it=it))
 
         return None

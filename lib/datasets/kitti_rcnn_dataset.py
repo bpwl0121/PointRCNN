@@ -79,7 +79,7 @@ class KittiRCNNDataset(KittiDataset):
                 else:
                     logger.info('Loading gt_database(%d) from %s' % (len(self.gt_database), gt_database_dir))
 
-            if mode == 'TRAIN':
+            if mode == 'TRAIN' or split == 'smallval':
                 self.preprocess_rpn_training_data()
             else:
                 self.sample_id_list = [int(sample_id) for sample_id in self.image_idx_list]
