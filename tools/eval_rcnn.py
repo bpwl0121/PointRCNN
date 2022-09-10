@@ -132,7 +132,7 @@ def eval_one_epoch_rpn(model, dataloader, epoch_id, result_dir, logger):
     dataset = dataloader.dataset
     cnt = max_num = rpn_iou_avg = 0
 
-    progress_bar = tqdm.tqdm(total=len(dataloader), leave=True, desc='eval')
+    progress_bar = tqdm.tqdm(total=len(dataloader), leave=True, desc='eval',disable=True)
 
     for data in dataloader:
         sample_id_list, pts_rect, pts_features, pts_input = \
@@ -276,7 +276,7 @@ def eval_one_epoch_rcnn(model, dataloader, epoch_id, result_dir, logger):
     dataset = dataloader.dataset
     cnt = final_total = total_cls_acc = total_cls_acc_refined = 0
 
-    progress_bar = tqdm.tqdm(total=len(dataloader), leave=True, desc='eval')
+    progress_bar = tqdm.tqdm(total=len(dataloader), leave=True, desc='eval',disable=True)
     for data in dataloader:
         sample_id = data['sample_id']
         cnt += 1
@@ -482,7 +482,7 @@ def eval_one_epoch_joint(model, dataloader, epoch_id, result_dir, logger):
     dataset = dataloader.dataset
     cnt = final_total = total_cls_acc = total_cls_acc_refined = total_rpn_iou = 0
 
-    progress_bar = tqdm.tqdm(total=len(dataloader), leave=True, desc='eval')
+    progress_bar = tqdm.tqdm(total=len(dataloader), leave=True, desc='eval',disable=True)
     for data in dataloader:
         cnt += 1
         sample_id, pts_rect, pts_features, pts_input = \
